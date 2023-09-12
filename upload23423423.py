@@ -1,6 +1,9 @@
 # huggingface-cli login --token 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 --add-to-git-credential
 # 首先去自己账号里面 new 一个dataset.  这里面我创立玩数据就是这个https://huggingface.co/datasets/zhangbo2008/video_data 链接能打开.
 #那么下面就可以往上面当网盘传数据了.
+
+import os
+os.system('huggingface-cli login --token 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 --add-to-git-credential')
 from huggingface_hub import HfApi
 api = HfApi()
 

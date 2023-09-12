@@ -35,8 +35,9 @@ args = parser.parse_args()
 args.data_root='lrs2_preprocessed'
 args.checkpoint_dir='newmodel'
 args.syncnet_checkpoint_path='checkpoints/lipsync_expert.pth'
+args.checkpoint_path='checkpoints/wav2lip_gan2.pth'
 
-
+hparams.checkpoint_interval=3000
 
 
 
