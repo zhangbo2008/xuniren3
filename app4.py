@@ -1,3 +1,5 @@
+# 这个版本 使用了chatglm2. 从hf上下载模型权重到/chatglm2-6b文件夹即可.
+
 import os
 import time
 from textwrap import dedent
