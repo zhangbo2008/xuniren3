@@ -15,6 +15,28 @@
 
 
 
+import os
+os.system('CUDA_VISIBLE_DEVICES=0')
+
+import bitsandbytes
+
+
+from transformers import AutoTokenizer, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model, AdaLoraConfig,prepare_model_for_kbit_training
+from transformers import (
+    set_seed,
+    HfArgumentParser,
+    TrainingArguments,
+    AutoModelForCausalLM
+)
+import argparse
+from loguru import logger
+import os
+from os.path import join
+import torch
+import bitsandbytes as bnb
+from collections import defaultdict
+
 
 
 
@@ -81,7 +103,35 @@ model_name = "THUDM/chatglm2-6b"  # 7x?G
 RETRY_FLAG = False
 
 tokenizer = AutoTokenizer.from_pretrained('/chatglm2-6b', trust_remote_code=True)
-model = AutoModel.from_pretrained('/chatglm2-6b', trust_remote_code=True).half().cuda()
+model = AutoModel.from_pretrained('/chatglm2-6b', trust_remote_code=True).quantize(8).cuda()  #=======节省显存.
+
+# #==========量化:
+# model_old = AutoModelForCausalLM.from_pretrained(
+# '/chatglm2-6b',
+# device_map='auto',
+# load_in_8bit=True,           #########???????????????这么加载训练精度很低吧.....
+# torch_dtype=torch.float16,
+# trust_remote_code=True,
+# quantization_config=BitsAndBytesConfig(
+#     load_in_8bit=True,
+
+#     llm_int8_threshold=6.0,
+#     llm_int8_has_fp16_weight=False,
+# ),
+# )
+
+
+
+
+
+
+
+
+
+
+
+
+
 print('llllllllllllll')
 # get dataset
 for i in range(100):
@@ -662,16 +712,6 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
             print('文件保存在',args.outfile)
             print('总时间',time.time()-adsf)
 
-
-
-
-
-
-
-
-
-
-
         return  videostate.update(args.outfile)
 
 
@@ -682,8 +722,8 @@ with gr.Blocks(title="ChatGLM2-6B-int8", theme=gr.themes.Soft(text_size="sm")) a
     with gr.Column(scale=4):
         with gr.Row():
             chatbot = gr.Chatbot()
-            videostate =gr.Video(value='test3.mp4',width=400,height=400, autoplay=False)
-            gr.videostate=videostate
+            videostate =gr.Video(value='result99999999.mp4',width=400,height=400, autoplay=True)
+
             print(videostate,33333333333333)
     with gr.Row():
         with gr.Column(scale=4):
@@ -733,7 +773,7 @@ with gr.Blocks(title="ChatGLM2-6B-int8", theme=gr.themes.Soft(text_size="sm")) a
         ],
         [chatbot, history, past_key_values],
         show_progress="full",
-    )
+    ).then(combine,inputs=[history],outputs=[videostate])
 
 
 
@@ -762,10 +802,7 @@ with gr.Blocks(title="ChatGLM2-6B-int8", theme=gr.themes.Soft(text_size="sm")) a
         [chatbot, history, past_key_values],
         show_progress="full",
         api_name="predict",
-    )
-    
-    
-    # .then(combine,inputs=[history],outputs=[videostate])
+    ).then(combine,inputs=[history],outputs=[videostate])
 
 
 
