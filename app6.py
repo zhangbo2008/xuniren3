@@ -1,5 +1,11 @@
 # 这个版本 使用了chatglm2. 从hf上下载模型权重到/chatglm2-6b文件夹即可.
-
+tmp_movie='waiguo.mp4'
+xunlianmask=1
+#==========视频转分辨率.
+minglign=f'ffmpeg -r 30 -i {tmp_movie} -s 720x720 -c:a copy new.mp4 -y'
+import os
+os.system(minglign)
+tmp_movie='new.mp4'
 
 
 
@@ -243,20 +249,12 @@ def predict(
     ):
         # print('得到的response',response[-1])
         chatbot[-1] = (parse_text(input), parse_text(response))
-        print(history)
+
         yield chatbot, history, past_key_values
     print('回答完所有之后函数的结果是',response)#=========在生成yield的循环之后获取即可.
     response2=response
     #==============这个函数后面加上数字人.
 
-    # print('切换视频')
-    # # gr.update(value='test6.mp4')
-    # gr.videostate.update(value='test6.mp4')
-    # # videostate.update(value='test6.mp4')
-    # print('切完')
-    # print('切完')
-    # print('切完')
-    # print('切完')
 
 
 
@@ -284,6 +282,7 @@ def delete_last_turn(chat, history):
 def retry_last_answer(
     user_input, chatbot, max_length, top_p, temperature, history, past_key_values
 ):
+    RETRY_FLAG=False
     if chatbot and history:
         # Removing the previous conversation from chat
         chatbot.pop(-1)
@@ -317,12 +316,37 @@ shutil.rmtree('tmp')
 os.mkdir('tmp')
 #=======================
 
+
+
+
+
+#=========加锁来保护全局变量cnt
+import threading
+
+# 创建锁    
+mutex = threading.Lock()
+
+
+
+
+
+
 def combine(history): #=======函数见传值, 需要在函数中写上. 不能用global.!!!!!!!!!!!!
+        global tmp_movie
         global cnt
+
+
+
+#=========加锁.
+        mutex.acquire()
+        cnt+=1#===========所有进程都共享这个变量.所以上来访问只要拿到锁就加加. 保证了各个进程之间互相命名不冲突.######==========不知道有没有锁, 
+        mutex.release()
+
+
         print('在切视频.')
         global videostate
         print('使用的history是',history,'这个是session真正变量.')
-        # print('使用的history是',history.value,'这个是session真正变量.')
+
         videostate.autoplay=True
         # gr.videostate.autoplay=True
         response2=history[-1][1]
@@ -463,7 +487,7 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
         args.img_size = 96
         args.face_det_batch_size = 4
         args.checkpoint_path = 'checkpoints/wav2lip_gan.pth'
-        args.wav2lip_batch_size =2000 # ======越大速度越快. 基本500足够了.
+        args.wav2lip_batch_size =200 # ======越大速度越快. 基本500足够了.
 
         print(8888888888888888,f'tmp/result{cnt}.mp4')
         args.outfile=f'tmp/result{cnt}.mp4'
@@ -472,7 +496,7 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
         #========改这里啊就行.
         args.face = args2.human
 
-        args.face = 'test3.mp4'
+        args.face = tmp_movie
         args.audio = wavfile
         print(1)
 
@@ -555,9 +579,9 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
             # print(a)
             img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
 
-
-            #=====写入:
-            if 0:
+            global xunlianmask
+            #=====写入: #================更改模型视频时候修改这里.
+            if xunlianmask:
                 if args.box[0] == -1:
                     if not args.static: # 需要每一个帧进行处理.
                         face_det_results = face_detect(frames) # BGR2RGB for CNN face detection
@@ -567,14 +591,16 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
                     print('Using the specified bounding box instead of face detection...')
                     y1, y2, x1, x2 = args.box
                     face_det_results = [[f[y1: y2, x1:x2], (y1, y2, x1, x2)] for f in frames]
-                import pickle
-                picklefile = open('marks', 'wb')
-                # Pickle the dictionary and write it to file
-                pickle.dump(face_det_results, picklefile)
-                # Close the file
-                picklefile.close()
-                print('写入了新的mark')
-                raise
+
+                if 0:
+                    import pickle
+                    picklefile = open('marks', 'wb')
+                    # Pickle the dictionary and write it to file
+                    pickle.dump(face_det_results, picklefile)
+                    # Close the file
+                    picklefile.close()
+                    print('写入了新的mark')
+                    raise
 
             if 1:
                 print(1)
@@ -668,7 +694,7 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
 
             wav = audio.load_wav(args.audio, 16000)
             mel = audio.melspectrogram(wav)
-            print(mel.shape)
+
 
             if np.isnan(mel.reshape(-1)).sum() > 0:
                 raise ValueError('Mel contains nan! Using a TTS voice? Add a small epsilon noise to the wav file and try again')
@@ -691,7 +717,7 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
             start=time.time()
             batch_size = args.wav2lip_batch_size
             gen = datagen(full_frames.copy(), mel_chunks)
-
+            c9=0
             for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, 
                                                     total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
                 global modelw
@@ -699,7 +725,7 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
                     
 
                     frame_h, frame_w = full_frames[0].shape[:-1]
-                    out = cv2.VideoWriter('temp/result.avi', 
+                    out = cv2.VideoWriter(f'temp/result{cnt}.avi', 
                                             cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
                 img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
@@ -709,18 +735,19 @@ def combine(history): #=======函数见传值, 需要在函数中写上. 不能�
                     pred = modelw(mel_batch, img_batch)
 
                 pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
-                cnt=1
+
                 for p, f, c in zip(pred, frames, coords):
                     y1, y2, x1, x2 = c
                     p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
-                    # cv2.imwrite(f'temp/{cnt}.png',p)
+                    cv2.imwrite(f'temp/{c9}.png',p)
+                    c9+=1
                     f[y1:y2, x1:x2] = p #======新的脸部贴上.
                     out.write(f)
-                    cnt+=1
+
 
             out.release()
             #-========给视频加上音频.
-            command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(args.audio, 'temp/result.avi', args.outfile)
+            command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(args.audio, f'temp/result{cnt}.avi', args.outfile)
             subprocess.call(command, shell=platform.system() != 'Windows')
             print('文件保存在',args.outfile)
             print('总时间',time.time()-adsf)
@@ -735,9 +762,9 @@ with gr.Blocks(title="ChatGLM2-6B-int8", theme=gr.themes.Soft(text_size="sm")) a
     with gr.Column(scale=4):
         with gr.Row():
             chatbot = gr.Chatbot()
-            videostate =gr.Video(value='result99999999.mp4',width=400,height=400, autoplay=True)
+            videostate =gr.Video(value=tmp_movie,width=400,height=400, autoplay=True)
 
-            print(videostate,33333333333333)
+
     with gr.Row():
         with gr.Column(scale=4):
             with gr.Column(scale=12):
@@ -831,11 +858,11 @@ with gr.Blocks(title="ChatGLM2-6B-int8", theme=gr.themes.Soft(text_size="sm")) a
 
     #===========添加submitBtn的相应为视频对应
     def videochufa():
-        print('运行videochufa')
+
         # videostate.play() # ========这种对象,不能传参,只能用全局变量.
         videostate.autoplay=True
         videostate.value='test6.mp4'
-        print(videostate.autoplay)
+
         from main9 import main
         # main('ffffff')
 
